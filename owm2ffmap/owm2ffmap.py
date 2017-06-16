@@ -44,6 +44,24 @@ def get_nodes():
     cache.set(url, body, expire=60*10)
     return body
 
+# extracts firmware-data from OWM-data and returns name and revision
+def parse_firmware(firmware):
+        try:
+            if "name" in firmware and len(firmware["name"])>0:
+                firmware_base = firmware["name"]  # Kathleen >= 0.2.0 uses "name" field
+            else:
+                firmware_base = firmware["revision"]  # "Freifunk Berlin kathleen 0.2.0-beta+718cff0"
+            firmware_base = re.sub(r'^Freifunk-Berlin', 'Freifunk Berlin', firmware_base)
+            firmware_base = re.sub(r'^Freifunk Berlin kathleen', 'Kathleen', firmware_base) # "Kathleen 0.2.0-beta+718cff0"
+            firmware_base = re.sub(r'^OpenWrt Attitude Adjustment', 'OpenWrt AA', firmware_base)
+            firmware_base = re.sub(r'^OpenWrt Barrier Breaker', 'OpenWrt BB', firmware_base)
+            firmware_base = re.sub(r'^OpenWrt Chaos Calmer', 'OpenWrt CC', firmware_base)
+            firmware_release = re.sub(r'\+[a-f0-9]{7}$', '', firmware_base)  # "Kathleen 0.2.0-beta"
+        except:
+            firmware_base = "unknown"
+            firmware_release = "unknown"
+    return(firmware_base, firmware_release)
+
 nodes = []
 graphnodes = dict()
 graphlinks = []
@@ -99,20 +117,8 @@ def process_node_json(url, body):
             email = ""
         longitude = owmnode["longitude"]
         latitude = owmnode["latitude"]
-        try:
-            if "name" in owmnode["firmware"] and len(owmnode["firmware"]["name"])>0:
-                firmware_base = owmnode["firmware"]["name"]  # Kathleen >= 0.2.0 uses "name" field
-            else:
-                firmware_base = owmnode["firmware"]["revision"]  # "Freifunk Berlin kathleen 0.2.0-beta+718cff0"
-            firmware_base = re.sub(r'^Freifunk-Berlin', 'Freifunk Berlin', firmware_base)
-            firmware_base = re.sub(r'^Freifunk Berlin kathleen', 'Kathleen', firmware_base) # "Kathleen 0.2.0-beta+718cff0"
-            firmware_base = re.sub(r'^OpenWrt Attitude Adjustment', 'OpenWrt AA', firmware_base)
-            firmware_base = re.sub(r'^OpenWrt Barrier Breaker', 'OpenWrt BB', firmware_base)
-            firmware_base = re.sub(r'^OpenWrt Chaos Calmer', 'OpenWrt CC', firmware_base)
-            firmware_release = re.sub(r'\+[a-f0-9]{7}$', '', firmware_base)  # "Kathleen 0.2.0-beta"
-        except:
-            firmware_base = "unknown"
-            firmware_release = "unknown"
+        (firmware_base, firmware_release) = parse_firmware(owmnode["firmware"])
+
         node = {'firstseen': firstseen,
                 'flags': {'online': isonline, 'uplink': isuplink},
                 'lastseen': lastseen,
