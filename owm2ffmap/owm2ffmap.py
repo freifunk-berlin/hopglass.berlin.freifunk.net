@@ -67,7 +67,12 @@ def parse_firmware(firmware):
                 elif firmware_pre020_dev.match(firmware["name"]):
                     print "pre-0.2.0 development"
                     firmware_base = re.sub(r'\+[a-f0-9]{7}$', '', firmware["name"])
-                    firmware_release = firmware["name"][-7:]
+                    # kathleen 0.2.0-alpha has some versions w/o git-hash
+                    # only fill firmware_release when we have a git-hash
+                    temp = firmware["name"].lstrip(firmware_base)
+                    if len(temp) > 0:
+                        firmware_release = temp.lstrip("+")
+                        temp = ""
                 elif firmware_openwrt.match(firmware["name"]):
                     print ("old OpenWRT firmware")
                     if  (firmware["name"].find("Attitude Adjustment") != -1) or \
