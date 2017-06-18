@@ -18,6 +18,7 @@ from diskcache import Cache
 cache = Cache('/dev/shm/owm2ffmap_cache')
 i = 0
 
+firmware_postkathleen = re.compile("^Freifunk Berlin [hH]edy 1\.[0-9]\.[0-9]")
 firmware_kathleen_correct = re.compile("^Freifunk Berlin kathleen 0\.[2-3]\.0$")
 firmware_kathleen_correct_dev = re.compile("^Freifunk[ -]Berlin [kK]athleen 0\.[2-3]\.0-.*\+[a-f0-9]{7}$")
 firmware_pre020  = re.compile("^Freifunk Berlin kathleen 0\.[0-1]\.[0-2]$")
@@ -87,9 +88,14 @@ def parse_firmware(firmware):
 		print "regular development"
 		firmware_base = re.sub(r'\+[a-f0-9]{7}$', '', firmware["name"])
 		firmware_release = firmware["name"][-7:]
+            elif firmware_postkathleen.match(firmware["name"]):
+                print "post kathleen firmware"
+                firmware_base = firmware["name"]
+                firmware_release = firmware["revision"]
             else:
-		print "unknown firmware-type"
+                print "unknown firmware-type"
             firmware_base = re.sub(r'^Freifunk-Berlin', 'Freifunk Berlin', firmware_base)
+            firmware_base = re.sub(r'^Freifunk Berlin hedy', 'Hedy', firmware_base)
             firmware_base = re.sub(r'^Freifunk Berlin kathleen', 'Kathleen', firmware_base) # "Kathleen 0.2.0-beta+718cff0"
             firmware_base = re.sub(r'^OpenWrt Attitude Adjustment', 'OpenWrt AA', firmware_base)
             firmware_base = re.sub(r'^OpenWrt Barrier Breaker', 'OpenWrt BB', firmware_base)
