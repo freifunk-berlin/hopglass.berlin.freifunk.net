@@ -55,39 +55,39 @@ def get_nodes():
 def parse_firmware(firmware):
         firmware_base = "unknown"
         firmware_release = "unknown"
-	print "Firmware (raw): %s/%s" % (firmware['name'], firmware['revision'])
+        print "Firmware (raw): %s/%s" % (firmware['name'], firmware['revision'])
         try:
             if "name" in firmware and len(firmware["name"])==0:
-              firmware["name"] = firmware["revision"]  # Kathleen < 0.2.0 uses "revision" field for all data
-	      firmware["revision"] = ""
-	      if firmware_pre020.match(firmware["name"]):
-		print "Kathlenn pre-0.2.0"
-		firmware_base = firmware["name"]
-		firmware_release = re.sub(r'^Freifunk Berlin kathleen ', 'v', firmware["name"])
-	      elif firmware_pre020_dev.match(firmware["name"]):
-		print "pre-0.2.0 development"
-		firmware_base = re.sub(r'\+[a-f0-9]{7}$', '', firmware["name"])
-		firmware_release = firmware["name"][-7:]
-	      elif firmware_openwrt.match(firmware["name"]):
-		print ("old OpenWRT firmware")
-		if (firmware["name"].find("Attitude Adjustment") != -1) or \
-                   (firmware["name"].find("Barrier Breaker berlin") != -1):
-		    print "found AA or BB pberg / berlin"
-		    (firmware_base, firmware_release) = firmware["name"].split('-')
-		elif firmware["name"].find("OpenWrt Chaos Calmer") != -1:
-		    (firmware_base, firmware_release) = firmware["name"].rsplit('r')
-		else:
-		    print  "unknown OpenWrt"
-	      else:
-		    print "other unknown firmware"
-	    elif firmware_kathleen_correct.match(firmware["name"]):
-		print "regular firmware-data"
-		firmware_base = firmware["name"]
-		firmware_release = firmware["revision"]
-	    elif firmware_kathleen_correct_dev.match(firmware["name"]):  # "Freifunk Berlin kathleen 0.2.0-beta+718cff0"
-		print "regular development"
-		firmware_base = re.sub(r'\+[a-f0-9]{7}$', '', firmware["name"])
-		firmware_release = firmware["name"][-7:]
+                firmware["name"] = firmware["revision"]  # Kathleen < 0.2.0 uses "revision" field for all data
+                firmware["revision"] = ""
+                if firmware_pre020.match(firmware["name"]):
+                    print "Kathlenn pre-0.2.0"
+                    firmware_base = firmware["name"]
+                    firmware_release = re.sub(r'^Freifunk Berlin kathleen ', 'v', firmware["name"])
+                elif firmware_pre020_dev.match(firmware["name"]):
+                    print "pre-0.2.0 development"
+                    firmware_base = re.sub(r'\+[a-f0-9]{7}$', '', firmware["name"])
+                    firmware_release = firmware["name"][-7:]
+                elif firmware_openwrt.match(firmware["name"]):
+                    print ("old OpenWRT firmware")
+                    if  (firmware["name"].find("Attitude Adjustment") != -1) or \
+                        (firmware["name"].find("Barrier Breaker berlin") != -1):
+                        print "found AA or BB pberg / berlin"
+                        (firmware_base, firmware_release) = firmware["name"].split('-')
+                    elif firmware["name"].find("OpenWrt Chaos Calmer") != -1:
+                        (firmware_base, firmware_release) = firmware["name"].rsplit('r')
+                    else:
+                        print  "unknown OpenWrt"
+                else:
+                    print "other unknown firmware"
+            elif firmware_kathleen_correct.match(firmware["name"]):
+                print "regular firmware-data"
+                firmware_base = firmware["name"]
+                firmware_release = firmware["revision"]
+            elif firmware_kathleen_correct_dev.match(firmware["name"]):  # "Freifunk Berlin kathleen 0.2.0-beta+718cff0"
+                print "regular development"
+                firmware_base = re.sub(r'\+[a-f0-9]{7}$', '', firmware["name"])
+                firmware_release = firmware["name"][-7:]
             elif firmware_postkathleen.match(firmware["name"]):
                 print "post kathleen firmware"
                 firmware_base = firmware["name"]
