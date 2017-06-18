@@ -87,7 +87,7 @@ def parse_firmware(firmware):
                     else:
                         print  "unknown OpenWrt"
                 else:
-                    print "other unknown firmware"
+                    firmware_base = re.sub(r'\+[a-f0-9]{7}$', '', firmware["name"])
             elif firmware_kathleen_correct.match(firmware["name"]):
                 print "regular firmware-data"
                 firmware_base = firmware["name"]
