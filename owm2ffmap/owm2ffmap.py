@@ -22,7 +22,7 @@ firmware_postkathleen = re.compile("^Freifunk Berlin [hH]edy 1\.[0-9]\.[0-9]")
 firmware_kathleen_correct = re.compile("^Freifunk Berlin kathleen 0\.[2-3]\.0$")
 firmware_kathleen_correct_dev = re.compile("^Freifunk[ -]Berlin [kK]athleen 0\.[2-3]\.0-.*\+[a-f0-9]{7}$")
 firmware_pre020  = re.compile("^Freifunk Berlin kathleen 0\.[0-1]\.[0-2]$")
-firmware_pre020_dev  = re.compile("^Freifunk Berlin kathleen 0\.[0-2]\.[0-2][ -].*")
+firmware_pre020_dev  = re.compile("^Freifunk[ -]Berlin kathleen 0\.[0-2]\.[0-2][ -].*")
 firmware_kathleen1505 = re.compile("^Freifunk Berlin kathleen 15.05(\.1){0,1}$")
 firmware_openwrt = re.compile("^OpenWrt .*")
 
