@@ -83,7 +83,7 @@ def parse_firmware(firmware):
                         print "found AA or BB pberg / berlin"
                         (firmware_base, firmware_release) = firmware["name"].split('-')
                     elif firmware["name"].find("OpenWrt Chaos Calmer") != -1:
-                        (firmware_base, firmware_release) = firmware["name"].rsplit('r')
+                        (firmware_base, firmware_release) = firmware["name"].rsplit(' ', 1)
                     else:
                         print  "unknown OpenWrt"
                 else:
