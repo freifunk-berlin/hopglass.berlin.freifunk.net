@@ -62,7 +62,7 @@ def parse_firmware(firmware):
                 firmware["name"] = firmware["revision"]  # Kathleen < 0.2.0 uses "revision" field for all data
                 firmware["revision"] = ""
                 if firmware_pre020.match(firmware["name"]):
-                    print "Kathlenn pre-0.2.0"
+                    print "Kathleen pre-0.2.0"
                     firmware_release = firmware["name"]
                     firmware_base = re.sub(r'^Freifunk Berlin kathleen ', 'v', firmware["name"])
                 elif firmware_pre020_dev.match(firmware["name"]):
@@ -110,6 +110,7 @@ def parse_firmware(firmware):
             firmware_release = re.sub(r'^OpenWrt Chaos Calmer', 'OpenWrt CC', firmware_release)
         except:
             print "firmwaredecode-exception"
+            traceback.print_exc(file=sys.stdout)
             firmware_base = "unknown"
             firmware_release = "unknown"
         print "Firmware: %s/%s" % (firmware_base, firmware_release)
