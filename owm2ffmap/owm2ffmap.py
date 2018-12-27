@@ -29,6 +29,9 @@ firmware_pre020_dev  = re.compile("^Freifunk[ -]Berlin kathleen 0\.[0-2]\.[0-2][
 firmware_kathleen1505 = re.compile("^Freifunk Berlin kathleen 15.05(\.1){0,1}$")
 firmware_openwrt = re.compile("^OpenWrt .*")
 
+bounding_box = "12.9,52.27,13.8,52.7"  # Berlin
+bounding_box_elems = [float(x) for x in bounding_box.split(",")]
+
 def handle_request(response):
     global i
     print "URL: %s, code: %d, bytes: %d, URLs to go: %d" % (response.effective_url, response.code, len(response.body) if response.code == 200 else 0, i)
@@ -45,7 +48,7 @@ def handle_request(response):
 
 def get_nodes():
     global cache
-    url = "http://api.openwifimap.net/view_nodes_spatial?bbox=12.9,52.27,13.8,52.7"  # Berlin
+    url = "http://api.openwifimap.net/view_nodes_spatial?bbox=" + bounding_box
     if url in cache:
         return cache[url]
     http_client = httpclient.HTTPClient()
@@ -54,6 +57,13 @@ def get_nodes():
     body = response.body
     cache.set(url, body, expire=60*10)
     return body
+
+def check_location(lonE, latN):
+    if not bounding_box_elems[0] < float(lonE) < bounding_box_elems[2]:
+        return False
+    if not bounding_box_elems[1] < float(latN) < bounding_box_elems[3]:
+        return False
+    return True
 
 # extracts firmware data from OWM data and returns name and revision
 def parse_firmware(firmware):
@@ -137,6 +147,11 @@ def process_node_json(comment, body, hostid=None, firstseen=None, lastseen=None)
         if lastseensecs > 60*60*24*7:
             print "...offline more than a week, skipping"
             return
+        longitude = owmnode["longitude"]
+        latitude = owmnode["latitude"]
+        if not check_location(float(longitude), float(latitude)):
+            print("...out of geographic bounds, skipping")
+            return
         isuplink = len([a for a in owmnode.get("interfaces", []) if a.get("ifname", "none") == "ffvpn"]) > 0
         hasclientdhcp = len([a for a in owmnode.get("interfaces", [])
                              if(a.get("encryption", "unknown") == "none" and a.get("mode", "unknown") == "ap")
@@ -172,8 +187,6 @@ def process_node_json(comment, body, hostid=None, firstseen=None, lastseen=None)
             email = owmnode["freifunk"]["contact"].get("mail", "")
         except:
             email = ""
-        longitude = owmnode["longitude"]
-        latitude = owmnode["latitude"]
 	if "firmware" in owmnode:
             (firmware_base, firmware_release) = parse_firmware(owmnode["firmware"])
 	else:
