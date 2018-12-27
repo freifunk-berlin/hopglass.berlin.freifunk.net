@@ -1,10 +1,12 @@
 import datetime
 import dateutil.parser
 import json
+import os
 import re
 import traceback
 import sys
 from tornado import gen, ioloop, httpclient
+from tornado.escape import url_unescape
 from diskcache import Cache
 
 # This is a quick hack to pull Freifunk node data for a specific geographic area
@@ -52,7 +54,7 @@ def get_nodes():
     cache.set(url, body, expire=60*10)
     return body
 
-# extracts firmware-data from OWM-data and returns name and revision
+# extracts firmware data from OWM data and returns name and revision
 def parse_firmware(firmware):
         firmware_base = "unknown"
         firmware_release = "unknown"
@@ -89,7 +91,7 @@ def parse_firmware(firmware):
                 else:
                     firmware_release = re.sub(r'\+[a-f0-9]{7}$', '', firmware["name"])
             elif firmware_kathleen_correct.match(firmware["name"]):
-                print "regular firmware-data"
+                print "regular firmware data"
                 firmware_release = firmware["name"]
                 firmware_base = firmware["revision"]
             elif firmware_kathleen_correct_dev.match(firmware["name"]):  # "Freifunk Berlin kathleen 0.2.0-beta+718cff0"
@@ -120,16 +122,17 @@ nodes = []
 graphnodes = dict()
 graphlinks = []
 
-def process_node_json(url, body):
+def process_node_json(url, body, hostid=None):
     global nodes
     global graphnodes
     global graphlinks
     try:
         print "Converting " + url
         owmnode = json.loads(body)
-        firstseen = owmnode["ctime"][:-1]
-        lastseen = owmnode["mtime"][:-1]
-        lastseensecs = (datetime.datetime.utcnow() - dateutil.parser.parse(lastseen)).total_seconds()
+        utcnow = datetime.datetime.utcnow()
+        firstseen = owmnode["ctime"][:-1] if "ctime" in owmnode else str(utcnow)
+        lastseen = owmnode["mtime"][:-1] if "mtime" in owmnode else str(utcnow)
+        lastseensecs = (utcnow - dateutil.parser.parse(lastseen)).total_seconds()
         isonline = lastseensecs < 60*60*24  # assume offline if not seen for more than a day
         if lastseensecs > 60*60*24*7:
             print "...offline more than a week, skipping"
@@ -144,7 +147,7 @@ def process_node_json(url, body):
             uptimesecs = owmnode["system"]["uptime"][0]
         except:
             uptimesecs = 0
-        hostid = owmnode["_id"]  # with ".olsr"
+        hostid = owmnode["_id"] if hostid is None else hostid  # with ".olsr"
         hostname = owmnode["hostname"]  # without ".olsr"
         is24ghz = True
         try:
@@ -222,26 +225,39 @@ def process_node_json(url, body):
 
 
 
-
-data = json.loads(get_nodes())
+try:
+    node_list = json.loads(get_nodes())
+except:
+    print("Error accessing openwifimap.net")
+    node_list = None
+    for nodename in os.listdir('/var/opt/ffmapdata/'):
+        if nodename.endswith(".json"):
+            nodefile = '/var/opt/ffmapdata/' + nodename;
+            with open(nodefile, 'r') as myfile:
+                data=myfile.read()
+            nodename = nodename.replace(".json", "")
+            nodename = url_unescape(nodename)
+            process_node_json(nodename, data, hostid=nodename)
 
 timestamp = datetime.datetime.utcnow().isoformat()
 
-http_client = httpclient.AsyncHTTPClient()
-for row in data["rows"]:
-    url = "http://api.openwifimap.net/db/" + row["id"].strip()
-    nodejson = cache.get(url, None)
-    if nodejson is None:
-        i += 1
-        http_client.fetch(url, handle_request, method='GET')  # calls process_node_json internally
-    else:
-        process_node_json(url, nodejson)
+if node_list is not None:
+    http_client = httpclient.AsyncHTTPClient()
+    for row in node_list["rows"]:
+        url = "http://api.openwifimap.net/db/" + row["id"].strip()
+        nodejson = cache.get(url, None)
+        if nodejson is None:
+            i += 1
+            http_client.fetch(url, handle_request, method='GET')  # calls process_node_json internally
+        else:
+            process_node_json(url, nodejson)
 
-print "Getting %d node infos" % i
-if i > 0:
-    ioloop.IOLoop.instance().start()
-
-# node data has been fetched and converted here
+    print "Getting %d node infos from openwifimap.net" % i
+    if i > 0:
+        ioloop.IOLoop.instance().start()
+    # node data has been fetched and converted here
+else:
+    print("openwifimap seems offline. Using local files.")
 
 # fixup links in graph.json
 brokenlinks = []
