@@ -2,6 +2,7 @@ import datetime
 import dateutil.parser
 import json
 import os
+from os.path import getmtime
 import re
 import traceback
 import sys
@@ -103,7 +104,7 @@ def parse_firmware(firmware):
                 firmware_release = firmware["name"]
                 firmware_base = firmware["revision"]
             else:
-                print "unknown firmware-type"
+                print "unknown firmware type"
             firmware_release = re.sub(r'^Freifunk-Berlin', 'Freifunk Berlin', firmware_release)
             firmware_release = re.sub(r'^Freifunk Berlin hedy', 'Hedy', firmware_release)
             firmware_release = re.sub(r'^Freifunk Berlin kathleen', 'Kathleen', firmware_release) # "Kathleen 0.2.0-beta+718cff0"
@@ -122,17 +123,16 @@ nodes = []
 graphnodes = dict()
 graphlinks = []
 
-def process_node_json(url, body, hostid=None):
+def process_node_json(comment, body, hostid=None, firstseen=None, lastseen=None):
     global nodes
     global graphnodes
     global graphlinks
     try:
-        print "Converting " + url
+        print "Converting " + comment
         owmnode = json.loads(body)
-        utcnow = datetime.datetime.utcnow()
-        firstseen = owmnode["ctime"][:-1] if "ctime" in owmnode else str(utcnow)
-        lastseen = owmnode["mtime"][:-1] if "mtime" in owmnode else str(utcnow)
-        lastseensecs = (utcnow - dateutil.parser.parse(lastseen)).total_seconds()
+        firstseen = owmnode["ctime"][:-1] if firstseen is None else firstseen
+        lastseen = owmnode["mtime"][:-1] if lastseen is None else lastseen
+        lastseensecs = (datetime.datetime.utcnow() - dateutil.parser.parse(lastseen)).total_seconds()
         isonline = lastseensecs < 60*60*24  # assume offline if not seen for more than a day
         if lastseensecs > 60*60*24*7:
             print "...offline more than a week, skipping"
@@ -235,9 +235,14 @@ except:
             nodefile = '/var/opt/ffmapdata/' + nodename;
             with open(nodefile, 'r') as myfile:
                 data=myfile.read()
+            lastseen = datetime.datetime.utcfromtimestamp(getmtime(nodefile)).isoformat()
+            try:
+                firstseen = datetime.datetime.utcfromtimestamp(getmtime(nodefile.replace(".json", ".ctime"))).isoformat()
+            except:
+                firstseen = lastseen
             nodename = nodename.replace(".json", "")
             nodename = url_unescape(nodename)
-            process_node_json(nodename, data, hostid=nodename)
+            process_node_json(nodename, data, hostid=nodename, firstseen=firstseen, lastseen=lastseen)
 
 timestamp = datetime.datetime.utcnow().isoformat()
 
