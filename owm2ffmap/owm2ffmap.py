@@ -21,6 +21,7 @@ from diskcache import Cache
 cache = Cache('/dev/shm/owm2ffmap_cache')
 i = 0
 
+firmware_prekathleen = re.compile("^Freifunk Berlin [0-9]\.*")
 firmware_postkathleen = re.compile("^Freifunk Berlin [hH]edy 1\.[0-9]\.[0-9]")
 firmware_kathleen_correct = re.compile("^Freifunk Berlin kathleen 0\.[2-3]\.0$")
 firmware_kathleen_correct_dev = re.compile("^Freifunk[ -]Berlin [kK]athleen 0\.[2-3]\.0-.*\+[a-f0-9]{7}$")
@@ -113,6 +114,10 @@ def parse_firmware(firmware):
                 print "post kathleen firmware"
                 firmware_release = firmware["name"]
                 firmware_base = firmware["revision"]
+            elif firmware_prekathleen.match(firmware["name"]):  # "Freifunk Berlin 1.1.0-alpha"
+                print "pre kathleen firmware"
+                firmware_release = firmware["name"]
+                firmware_base = firmware["revision"]
             else:
                 print "unknown firmware type"
             firmware_release = re.sub(r'^Freifunk-Berlin', 'Freifunk Berlin', firmware_release)
@@ -182,7 +187,7 @@ def process_node_json(comment, body, hostid=None, firstseen=None, lastseen=None)
                 # For Ubiquiti routers, add 2.4GHz/5GHz indication
                 hardware_model = hardware_model.replace(' M', " M2" if is24ghz else " M5")
         except:
-            hardware_model = "unknown"
+            hardware_model = "unknown" if chipset == "unknown" else "unknown (%s)" % chipset
         try:
             email = owmnode["freifunk"]["contact"].get("mail", "")
         except:
