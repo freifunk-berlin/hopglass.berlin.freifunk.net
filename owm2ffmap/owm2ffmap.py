@@ -242,70 +242,70 @@ def process_node_json(comment, body, hostid=None, firstseen=None, lastseen=None)
 
 
 
+if __name__ == "__main__":
+    try:
+        node_list = json.loads(get_nodes())
+    except:
+        print("Error accessing openwifimap.net")
+        node_list = None
+        for nodename in os.listdir('/var/opt/ffmapdata/'):
+            if nodename.endswith(".json"):
+                nodefile = '/var/opt/ffmapdata/' + nodename;
+                with open(nodefile, 'r') as myfile:
+                    data=myfile.read()
+                lastseen = datetime.datetime.utcfromtimestamp(getmtime(nodefile)).isoformat()
+                try:
+                    firstseen = datetime.datetime.utcfromtimestamp(getmtime(nodefile.replace(".json", ".ctime"))).isoformat()
+                except:
+                    firstseen = lastseen
+                nodename = nodename.replace(".json", "")
+                nodename = url_unescape(nodename)
+                process_node_json(nodename, data, hostid=nodename, firstseen=firstseen, lastseen=lastseen)
 
-try:
-    node_list = json.loads(get_nodes())
-except:
-    print("Error accessing openwifimap.net")
-    node_list = None
-    for nodename in os.listdir('/var/opt/ffmapdata/'):
-        if nodename.endswith(".json"):
-            nodefile = '/var/opt/ffmapdata/' + nodename;
-            with open(nodefile, 'r') as myfile:
-                data=myfile.read()
-            lastseen = datetime.datetime.utcfromtimestamp(getmtime(nodefile)).isoformat()
-            try:
-                firstseen = datetime.datetime.utcfromtimestamp(getmtime(nodefile.replace(".json", ".ctime"))).isoformat()
-            except:
-                firstseen = lastseen
-            nodename = nodename.replace(".json", "")
-            nodename = url_unescape(nodename)
-            process_node_json(nodename, data, hostid=nodename, firstseen=firstseen, lastseen=lastseen)
+    timestamp = datetime.datetime.utcnow().isoformat()
 
-timestamp = datetime.datetime.utcnow().isoformat()
+    if node_list is not None:
+        http_client = httpclient.AsyncHTTPClient()
+        for row in node_list["rows"]:
+            url = "http://api.openwifimap.net/db/" + row["id"].strip()
+            nodejson = cache.get(url, None)
+            if nodejson is None:
+                i += 1
+                http_client.fetch(url, handle_request, method='GET')  # calls process_node_json internally
+            else:
+                process_node_json(url, nodejson)
 
-if node_list is not None:
-    http_client = httpclient.AsyncHTTPClient()
-    for row in node_list["rows"]:
-        url = "http://api.openwifimap.net/db/" + row["id"].strip()
-        nodejson = cache.get(url, None)
-        if nodejson is None:
-            i += 1
-            http_client.fetch(url, handle_request, method='GET')  # calls process_node_json internally
-        else:
-            process_node_json(url, nodejson)
+        print "Getting %d node infos from openwifimap.net" % i
+        if i > 0:
+            ioloop.IOLoop.instance().start()
+        # node data has been fetched and converted here
+    else:
+        print("openwifimap seems offline. Using local files.")
 
-    print "Getting %d node infos from openwifimap.net" % i
-    if i > 0:
-        ioloop.IOLoop.instance().start()
-    # node data has been fetched and converted here
-else:
-    print("openwifimap seems offline. Using local files.")
+    # fixup links in graph.json
+    brokenlinks = []
+    for link in graphlinks:
+      try:
+        link["source"] = graphnodes[link["source"]]["seq"]
+        link["target"] = graphnodes[link["target"]]["seq"]
+      except:
+        print "Could not resolve source %s or target %s for graph" % (link["source"], link["target"])
+        brokenlinks.append(link)
+    graphlinks = [link for link in graphlinks if link not in brokenlinks]
 
-# fixup links in graph.json
-brokenlinks = []
-for link in graphlinks:
-  try:
-    link["source"] = graphnodes[link["source"]]["seq"]
-    link["target"] = graphnodes[link["target"]]["seq"]
-  except:
-    print "Could not resolve source %s or target %s for graph" % (link["source"], link["target"])
-    brokenlinks.append(link)
-graphlinks = [link for link in graphlinks if link not in brokenlinks]
+    graphnodes = [node for _, node in graphnodes.iteritems()]
+    graphnodes = sorted(graphnodes, key=lambda x: x["seq"])
+    graph = {"batadv": {"directed": False, "graph": [], "links": graphlinks, "multigraph": False, "nodes": graphnodes}, "version": 1}
+    print graph
+    with open("graph.json", "w") as outfile:
+        json.dump(graph, outfile)
 
-graphnodes = [node for _, node in graphnodes.iteritems()]
-graphnodes = sorted(graphnodes, key=lambda x: x["seq"])
-graph = {"batadv": {"directed": False, "graph": [], "links": graphlinks, "multigraph": False, "nodes": graphnodes}, "version": 1}
-print graph
-with open("graph.json", "w") as outfile:
-    json.dump(graph, outfile)
+    # finalize nodes.json
+    nodes = {"nodes": nodes, "timestamp": timestamp, "version": 2}
+    print nodes
+    with open("nodes.json", "w") as outfile:
+        json.dump(nodes, outfile)
 
-# finalize nodes.json
-nodes = {"nodes": nodes, "timestamp": timestamp, "version": 2}
-print nodes
-with open("nodes.json", "w") as outfile:
-    json.dump(nodes, outfile)
+    print "Wrote %d nodes." % len(nodes["nodes"])
 
-print "Wrote %d nodes." % len(nodes["nodes"])
-
-cache.close()
+    cache.close()
