@@ -22,7 +22,9 @@ cache = Cache('/dev/shm/owm2ffmap_cache')
 i = 0
 
 firmware_prekathleen = re.compile("^Freifunk Berlin [0-9]\.*")
-firmware_postkathleen = re.compile("^Freifunk Berlin [hH]edy 1\.[0-9]\.[0-9]")
+firmware_hedy = re.compile("^Freifunk Berlin [hH]edy 1\.[0-9]\.[0-9]")
+firmware_ffb_dev = re.compile("^Freifunk Berlin Dev")
+firmware_potsdam = re.compile("^Freifunk Potsdam")
 firmware_kathleen_correct = re.compile("^Freifunk Berlin kathleen 0\.[2-3]\.0$")
 firmware_kathleen_correct_dev = re.compile("^Freifunk[ -]Berlin [kK]athleen 0\.[2-3]\.0-.*\+[a-f0-9]{7}$")
 firmware_pre020  = re.compile("^Freifunk Berlin kathleen 0\.[0-1]\.[0-2]$")
@@ -110,16 +112,26 @@ def parse_firmware(firmware):
                 print "regular development"
                 firmware_release = re.sub(r'\+[a-f0-9]{7}$', '', firmware["name"])
                 firmware_base = firmware["name"][-7:]
-            elif firmware_postkathleen.match(firmware["name"]):
-                print "post kathleen firmware"
+            elif firmware_hedy.match(firmware["name"]):
+                print "hedy firmware"
                 firmware_release = firmware["name"]
                 firmware_base = firmware["revision"]
             elif firmware_prekathleen.match(firmware["name"]):  # "Freifunk Berlin 1.1.0-alpha"
                 print "pre kathleen firmware"
                 firmware_release = firmware["name"]
                 firmware_base = firmware["revision"]
+            elif firmware_ffb_dev.match(firmware["name"]):  # "Freifunk Berlin Dev-daily"
+                print "Freifunk Berlin Dev"
+                firmware_release = firmware["name"]
+                firmware_base = firmware["revision"]
+            elif firmware_potsdam.match(firmware["name"]):  # "Freifunk Potsdam"
+                print "Freifunk Potsdam"
+                firmware_release = firmware["name"]
+                firmware_base = firmware["revision"]
             else:
                 print "unknown firmware type"
+                firmware_release = firmware.get("name", "unknown")
+                firmware_base = firmware.get("revision", "unknown")
             firmware_release = re.sub(r'^Freifunk-Berlin', 'Freifunk Berlin', firmware_release)
             firmware_release = re.sub(r'^Freifunk Berlin hedy', 'Hedy', firmware_release)
             firmware_release = re.sub(r'^Freifunk Berlin kathleen', 'Kathleen', firmware_release) # "Kathleen 0.2.0-beta+718cff0"
@@ -131,7 +143,7 @@ def parse_firmware(firmware):
             traceback.print_exc(file=sys.stdout)
             firmware_base = "unknown"
             firmware_release = "unknown"
-        print "Firmware: %s/%s" % (firmware_base, firmware_release)
+        print "Firmware release '%s', base '%s'" % (firmware_release, firmware_base)
         return(firmware_base, firmware_release)
 
 nodes = []
@@ -192,10 +204,12 @@ def process_node_json(comment, body, hostid=None, firstseen=None, lastseen=None)
             email = owmnode["freifunk"]["contact"].get("mail", "")
         except:
             email = ""
-	if "firmware" in owmnode:
-            (firmware_base, firmware_release) = parse_firmware(owmnode["firmware"])
-	else:
-	    (firmware_base, firmware_release) = ("outdated", "unknown")
+        if "firmware" in owmnode:
+                (firmware_base, firmware_release) = parse_firmware(owmnode["firmware"])
+        else:
+            (firmware_base, firmware_release) = ("outdated", owmnode.get("script", "unknown"))
+            print "no 'firmware' JSON node found, using 'script' fallback"
+            print "Firmware release '%s', base '%s'" % (firmware_release, firmware_base)
 
         node = {'firstseen': firstseen,
                 'flags': {'online': isonline, 'uplink': isuplink},
