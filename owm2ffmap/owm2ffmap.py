@@ -207,8 +207,8 @@ def process_node_json(comment, body, hostid=None, firstseen=None, lastseen=None)
         if "firmware" in owmnode:
                 (firmware_base, firmware_release) = parse_firmware(owmnode["firmware"])
         else:
-            (firmware_base, firmware_release) = ("outdated", owmnode.get("script", "unknown"))
-            print "no 'firmware' JSON node found, using 'script' fallback"
+            (firmware_base, firmware_release) = ("outdated", "unknown (%s)" % owmnode["script"] if "script" in owmnode else "unknown")
+            print "no 'firmware' JSON node found"
             print "Firmware release '%s', base '%s'" % (firmware_release, firmware_base)
 
         node = {'firstseen': firstseen,
