@@ -37,12 +37,12 @@ bounding_box_elems = [float(x) for x in bounding_box.split(",")]
 
 def handle_request(response):
     global i
-    print "URL: %s, code: %d, bytes: %d, URLs to go: %d" % (response.effective_url, response.code, len(response.body) if response.code == 200 else 0, i)
+    print("URL: %s, code: %d, bytes: %d, URLs to go: %d" % (response.effective_url, response.code, len(response.body) if response.code == 200 else 0, i))
     if response.code == 200:
         cache.set(response.effective_url, response.body, expire=60*30)
         process_node_json(response.effective_url, response.body)
     elif response.code == 599:
-        print "Timeout for %s, re-queuing" % response.effective_url
+        print("Timeout for %s, re-queuing" % response.effective_url)
         http_client.fetch(response.effective_url, handle_request, method='GET')
         i += 1
     i -= 1
@@ -72,17 +72,17 @@ def check_location(lonE, latN):
 def parse_firmware(firmware):
         firmware_base = "unknown"
         firmware_release = "unknown"
-        print "Firmware (raw): %s/%s" % (firmware['name'], firmware['revision'])
+        print("Firmware (raw): %s/%s" % (firmware['name'], firmware['revision']))
         try:
             if "name" in firmware and len(firmware["name"])==0:
                 firmware["name"] = firmware["revision"]  # Kathleen < 0.2.0 uses "revision" field for all data
                 firmware["revision"] = ""
                 if firmware_pre020.match(firmware["name"]):
-                    print "Kathleen pre-0.2.0"
+                    print("Kathleen pre-0.2.0")
                     firmware_release = firmware["name"]
                     firmware_base = re.sub(r'^Freifunk Berlin kathleen ', 'v', firmware["name"])
                 elif firmware_pre020_dev.match(firmware["name"]):
-                    print "pre-0.2.0 development"
+                    print("pre-0.2.0 development")
                     firmware_release = re.sub(r'\+[a-f0-9]{7}$', '', firmware["name"])
                     # kathleen 0.2.0-alpha has some versions w/o git-hash
                     # only fill firmware_base when we have a git-hash
@@ -93,43 +93,44 @@ def parse_firmware(firmware):
                 elif firmware_kathleen1505.match(firmware["name"]):
                     firmware_release = firmware["name"]
                 elif firmware_openwrt.match(firmware["name"]):
-                    print ("old OpenWRT firmware")
+                    print("old OpenWRT firmware")
                     if  (firmware["name"].find("Attitude Adjustment") != -1) or \
                         (firmware["name"].find("Barrier Breaker berlin") != -1):
-                        print "found AA or BB pberg / berlin"
+                        print("found AA or BB pberg / berlin")
                         (firmware_release, firmware_base) = firmware["name"].split('-')
                     elif firmware["name"].find("OpenWrt Chaos Calmer") != -1:
                         (firmware_release, firmware_base) = firmware["name"].rsplit(' ', 1)
                     else:
-                        print  "unknown OpenWrt"
+                        print("unknown OpenWrt")
                 else:
                     firmware_release = re.sub(r'\+[a-f0-9]{7}$', '', firmware["name"])
             elif firmware_kathleen_correct.match(firmware["name"]):
-                print "regular firmware data"
+                print("regular firmware data")
+
                 firmware_release = firmware["name"]
                 firmware_base = firmware["revision"]
             elif firmware_kathleen_correct_dev.match(firmware["name"]):  # "Freifunk Berlin kathleen 0.2.0-beta+718cff0"
-                print "regular development"
+                print("regular development")
                 firmware_release = re.sub(r'\+[a-f0-9]{7}$', '', firmware["name"])
                 firmware_base = firmware["name"][-7:]
             elif firmware_hedy.match(firmware["name"]):
-                print "hedy firmware"
+                print("hedy firmware")
                 firmware_release = firmware["name"]
                 firmware_base = firmware["revision"]
             elif firmware_prekathleen.match(firmware["name"]):  # "Freifunk Berlin 1.1.0-alpha"
-                print "pre kathleen firmware"
+                print("pre kathleen firmware")
                 firmware_release = firmware["name"]
                 firmware_base = firmware["revision"]
             elif firmware_ffb_dev.match(firmware["name"]):  # "Freifunk Berlin Dev-daily"
-                print "Freifunk Berlin Dev"
+                print("Freifunk Berlin Dev")
                 firmware_release = firmware["name"]
                 firmware_base = firmware["revision"]
             elif firmware_potsdam.match(firmware["name"]):  # "Freifunk Potsdam"
-                print "Freifunk Potsdam"
+                print("Freifunk Potsdam")
                 firmware_release = firmware["name"]
                 firmware_base = firmware["revision"]
             else:
-                print "unknown firmware type"
+                print("unknown firmware type")
                 firmware_release = firmware.get("name", "unknown")
                 firmware_base = firmware.get("revision", "unknown")
             firmware_release = re.sub(r'^Freifunk-Berlin', 'Freifunk Berlin', firmware_release)
@@ -139,11 +140,11 @@ def parse_firmware(firmware):
             firmware_release = re.sub(r'^OpenWrt Barrier Breaker', 'OpenWrt BB', firmware_release)
             firmware_release = re.sub(r'^OpenWrt Chaos Calmer', 'OpenWrt CC', firmware_release)
         except:
-            print "firmwaredecode-exception"
+            print("firmwaredecode-exception")
             traceback.print_exc(file=sys.stdout)
             firmware_base = "unknown"
             firmware_release = "unknown"
-        print "Firmware release '%s', base '%s'" % (firmware_release, firmware_base)
+        print("Firmware release '%s', base '%s'" % (firmware_release, firmware_base))
         return(firmware_base, firmware_release)
 
 nodes = []
@@ -155,14 +156,14 @@ def process_node_json(comment, body, hostid=None, firstseen=None, lastseen=None)
     global graphnodes
     global graphlinks
     try:
-        print "Converting " + comment
+        print("Converting " + comment)
         owmnode = json.loads(body)
         firstseen = owmnode["ctime"][:-1] if firstseen is None else firstseen
         lastseen = owmnode["mtime"][:-1] if lastseen is None else lastseen
         lastseensecs = (datetime.datetime.utcnow() - dateutil.parser.parse(lastseen)).total_seconds()
         isonline = lastseensecs < 60*60*24  # assume offline if not seen for more than a day
         if lastseensecs > 60*60*24*7:
-            print "...offline more than a week, skipping"
+            print("...offline more than a week, skipping")
             return
         longitude = owmnode["longitude"]
         latitude = owmnode["latitude"]
@@ -208,8 +209,8 @@ def process_node_json(comment, body, hostid=None, firstseen=None, lastseen=None)
                 (firmware_base, firmware_release) = parse_firmware(owmnode["firmware"])
         else:
             (firmware_base, firmware_release) = ("outdated", "unknown (%s)" % owmnode["script"] if "script" in owmnode else "unknown")
-            print "no 'firmware' JSON node found"
-            print "Firmware release '%s', base '%s'" % (firmware_release, firmware_base)
+            print("no 'firmware' JSON node found")
+            print("Firmware release '%s', base '%s'" % (firmware_release, firmware_base))
 
         node = {'firstseen': firstseen,
                 'flags': {'online': isonline, 'uplink': isuplink},
@@ -233,7 +234,7 @@ def process_node_json(comment, body, hostid=None, firstseen=None, lastseen=None)
                 }
                }
         nodes.append(node)
-        print node
+        print(node)
 
         for link in owmnode.get("links", []):
           targetid = link["id"]
@@ -245,10 +246,10 @@ def process_node_json(comment, body, hostid=None, firstseen=None, lastseen=None)
                        'tq': quality,
                        'vpn': False}
           graphlinks.append(graphlink)
-          print graphlink
+          print(graphlink)
         graphnodes[hostid] = {"id": hostid, "node_id": hostid, "seq": len(graphnodes)}
-        print graphnodes[hostid]
-        print "**********************************"
+        print(graphnodes[hostid])
+        print("**********************************")
     except:
         traceback.print_exc(file=sys.stdout)
 
@@ -289,7 +290,7 @@ if __name__ == "__main__":
             else:
                 process_node_json(url, nodejson)
 
-        print "Getting %d node infos from openwifimap.net" % i
+        print("Getting %d node infos from openwifimap.net" % i)
         if i > 0:
             ioloop.IOLoop.instance().start()
         # node data has been fetched and converted here
@@ -303,23 +304,23 @@ if __name__ == "__main__":
         link["source"] = graphnodes[link["source"]]["seq"]
         link["target"] = graphnodes[link["target"]]["seq"]
       except:
-        print "Could not resolve source %s or target %s for graph" % (link["source"], link["target"])
+        print("Could not resolve source %s or target %s for graph" % (link["source"], link["target"]))
         brokenlinks.append(link)
     graphlinks = [link for link in graphlinks if link not in brokenlinks]
 
     graphnodes = [node for _, node in graphnodes.iteritems()]
     graphnodes = sorted(graphnodes, key=lambda x: x["seq"])
     graph = {"batadv": {"directed": False, "graph": [], "links": graphlinks, "multigraph": False, "nodes": graphnodes}, "version": 1}
-    print graph
+    print(graph)
     with open("graph.json", "w") as outfile:
         json.dump(graph, outfile)
 
     # finalize nodes.json
     nodes = {"nodes": nodes, "timestamp": timestamp, "version": 2}
-    print nodes
+    print(nodes)
     with open("nodes.json", "w") as outfile:
         json.dump(nodes, outfile)
 
-    print "Wrote %d nodes." % len(nodes["nodes"])
+    print("Wrote %d nodes." % len(nodes["nodes"]))
 
     cache.close()
