@@ -147,6 +147,29 @@ def parse_firmware(firmware):
         print("Firmware release '%s', base '%s'" % (firmware_release, firmware_base))
         return(firmware_base, firmware_release)
 
+
+def get_wifi_data(owmnode):
+    """get the wifi channels and wifi-modes of all wireless interfaces"""
+    channel_mode_values = []
+    if_list = owmnode[interfaces]
+    
+    for iface in if_list:
+        #iterate over interfaces and fetch wifi interfaces channels and modes.
+        try:
+            wifi_channel = iface[wifi][0][channel]
+        except:
+            continue
+        try:
+            wifi_mode = iface[wifi][0][mode]
+        except:
+            wifi_mode = None
+        
+        if wifi_mode:
+            channel_mode_values.append({'channel': wifi_channel, 'mode': wifi_mode})
+    
+    return channel_mode_values
+            
+
 nodes = []
 graphnodes = dict()
 graphlinks = []
@@ -190,6 +213,9 @@ def process_node_json(comment, body, hostid=None, firstseen=None, lastseen=None)
                         is24ghz = False
         except:
             pass
+        
+        channel_and_modes = get_wifi_data(owmnode)
+        
         try:
             chipset = owmnode.get("hardware", "unknown").strip()
         except:
@@ -223,6 +249,7 @@ def process_node_json(comment, body, hostid=None, firstseen=None, lastseen=None)
                     #'network': {'addresses': False, #TODO
                     #            'mac': False, #TODO
                     #            'mesh': False}, #TODO
+                    'wifi': {channel_and_modes},
                     'node_id': hostid,
                     'owner': {'contact': email},
                     'software': {'firmware': {'base': firmware_base, 'release': firmware_release}},
