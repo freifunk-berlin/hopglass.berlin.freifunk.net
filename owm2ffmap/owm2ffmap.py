@@ -315,7 +315,7 @@ if __name__ == "__main__":
         brokenlinks.append(link)
     graphlinks = [link for link in graphlinks if link not in brokenlinks]
 
-    graphnodes = [node for _, node in graphnodes.iteritems()]
+    graphnodes = [node for _, node in graphnodes.items()]
     graphnodes = sorted(graphnodes, key=lambda x: x["seq"])
     graph = {"batadv": {"directed": False, "graph": [], "links": graphlinks, "multigraph": False, "nodes": graphnodes}, "version": 1}
     print(graph)
