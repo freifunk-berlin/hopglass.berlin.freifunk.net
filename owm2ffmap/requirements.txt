@@ -1,5 +1,5 @@
-tornado 5.x 
-# we explicitly need a tornado version from 5.x branch! In more recent versions the 
+tornado~=5.0
+# we explicitly need a tornado version from 5.x branch! In more recent versions the
 # callback-argument from httpclient.AsyncHTTPClient.fetch() is removed, which needs
 # a new implementation of the handle_request() function using more modern async.io system.
 diskcache
