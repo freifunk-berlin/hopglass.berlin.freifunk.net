@@ -35,7 +35,9 @@ firmware_openwrt = re.compile("^OpenWrt .*")
 bounding_box = "12.9,52.27,13.8,52.7"  # Berlin
 bounding_box_elems = [float(x) for x in bounding_box.split(",")]
 
+
 def handle_request(response):
+    """requests node-data using the asynchronous http-client of tornado module."""
     global i
     print("URL: %s, code: %d, bytes: %d, URLs to go: %d" % (response.effective_url, response.code, len(response.body) if response.code == 200 else 0, i))
     if response.code == 200:
@@ -50,6 +52,7 @@ def handle_request(response):
         ioloop.IOLoop.instance().stop()
 
 def get_nodes():
+    """gets a list of all routers within the bounding box from openwifimap"""
     global cache
     url = "http://api.openwifimap.net/view_nodes_spatial?bbox=" + bounding_box
     if url in cache:
@@ -62,14 +65,15 @@ def get_nodes():
     return body
 
 def check_location(lonE, latN):
+    """excludes all routers outside the boundary box from processing"""
     if not bounding_box_elems[0] < float(lonE) < bounding_box_elems[2]:
         return False
     if not bounding_box_elems[1] < float(latN) < bounding_box_elems[3]:
         return False
     return True
 
-# extracts firmware data from OWM data and returns name and revision
 def parse_firmware(firmware):
+        """extracts firmware data from OWM data and returns firmware name and revision"""
         firmware_base = "unknown"
         firmware_release = "unknown"
         print("Firmware (raw): %s/%s" % (firmware['name'], firmware['revision']))
@@ -152,6 +156,8 @@ graphnodes = dict()
 graphlinks = []
 
 def process_node_json(comment, body, hostid=None, firstseen=None, lastseen=None):
+    """transforms node data into ffmap-format. Does some interpretation on node
+       data too (figure out if node has WAN-uplink, etc)"""
     global nodes
     global graphnodes
     global graphlinks
@@ -170,6 +176,7 @@ def process_node_json(comment, body, hostid=None, firstseen=None, lastseen=None)
         if not check_location(float(longitude), float(latitude)):
             print("...out of geographic bounds, skipping")
             return
+        # check if the router itself has an uplink. returns True or False
         isuplink = len([a for a in owmnode.get("interfaces", []) if a.get("ifname", "none") == "ffvpn"]) > 0
         hasclientdhcp = len([a for a in owmnode.get("interfaces", [])
                              if(a.get("encryption", "unknown") == "none" and a.get("mode", "unknown") == "ap")
