@@ -176,8 +176,24 @@ def process_node_json(comment, body, hostid=None, firstseen=None, lastseen=None)
         if not check_location(float(longitude), float(latitude)):
             print("...out of geographic bounds, skipping")
             return
-        # check if the router itself has an uplink. returns True or False
-        isuplink = len([a for a in owmnode.get("interfaces", []) if a.get("ifname", "none") == "ffvpn"]) > 0
+
+        # special case: fetch wether there is uplink or not for hedy-devices. general case below
+        try:
+            fw_name = owmnode['firmware']['name']
+        except:
+            fw_name = 'nothing' # Boolean __None__ would result in roughly 40 nodes being dropped.
+        if firmware_hedy.match(fw_name):
+            isuplink = False
+            for iface in owmnode["interfaces"]:
+                try:
+                    if iface["device"] == "ffuplink":
+                        isuplink = True
+                        break #avoid further iteration to save computing-power
+                except:
+                    continue
+        else:
+            # general case: check if the router itself has an uplink via WAN. returns True or False
+            isuplink = len([a for a in owmnode.get("interfaces", []) if a.get("ifname", "none") == "ffvpn"]) > 0
         hasclientdhcp = len([a for a in owmnode.get("interfaces", [])
                              if(a.get("encryption", "unknown") == "none" and a.get("mode", "unknown") == "ap")
                                or a.get("ifname", "none") == "br-dhcp"
