@@ -7,8 +7,8 @@
   "internal_comment": "compare maps on http://mc.bbbike.org/",
   "mapLayers": [
     {
-      "name": "OSM SE hydda roads",
-      "url": "http://{s}.tile.openstreetmap.se/hydda/roads_and_labels/{z}/{x}/{y}.png",
+      "name": "OSM Mapnik (DE)",
+      "url": "http://{s}.tile.openstreetmap.de/tiles/osmde/{z}/{x}/{y}.png",
       "config": {
         "#subdomains": "1234",
         "type": "osm",
@@ -17,8 +17,8 @@
       }
     },
     {
-      "name": "OSM Mapnik (DE)",
-      "url": "http://{s}.tile.openstreetmap.de/tiles/osmde/{z}/{x}/{y}.png",
+      "name": "OSM SE hydda roads",
+      "url": "http://{s}.tile.openstreetmap.se/hydda/roads_and_labels/{z}/{x}/{y}.png",
       "config": {
         "#subdomains": "1234",
         "type": "osm",
