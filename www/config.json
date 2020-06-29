@@ -8,7 +8,7 @@
   "mapLayers": [
     {
       "name": "OSM Mapnik (DE)",
-      "url": "http://{s}.tile.openstreetmap.de/tiles/osmde/{z}/{x}/{y}.png",
+      "url": "https://{s}.tile.openstreetmap.de/tiles/osmde/{z}/{x}/{y}.png",
       "config": {
         "#subdomains": "1234",
         "type": "osm",
@@ -17,12 +17,12 @@
       }
     },
     {
-      "name": "OSM SE hydda roads",
-      "url": "http://{s}.tile.openstreetmap.se/hydda/roads_and_labels/{z}/{x}/{y}.png",
+      "name": "stamen.com toner-lite",
+      "url": "https://stamen-tiles-{s}.a.ssl.fastly.net/toner-lite/{z}/{x}/{y}.png",
       "config": {
         "#subdomains": "1234",
         "type": "osm",
-        "attribution": "Tiles &copy; 2016 <a href=\"http://bbbike.org/\">BBBike.org</a> &amp; <a href=\"https://www.geofabrik.de/\">Geofabrik GmbH</a> - map data (&copy;) <a href=\"https://www.openstreetmap.org/\">OpenStreetMap.org</a>",
+        "attribution": "Map tiles by <a href=\"http://stamen.com\">Stamen Design</a>, under <a href=\"http://creativecommons.org/licenses/by/3.0\">CC BY 3.0</a>. Data by <a href=\"http://openstreetmap.org\">OpenStreetMap</a>, under <a href=\"http://www.openstreetmap.org/copyright\">ODbL</a>.",
         "maxZoom": 18
       }
     }
