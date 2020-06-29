@@ -32,7 +32,7 @@ firmware_pre020_dev  = re.compile("^Freifunk[ -]Berlin kathleen 0\.[0-2]\.[0-2][
 firmware_kathleen1505 = re.compile("^Freifunk Berlin kathleen 15.05(\.1){0,1}$")
 firmware_openwrt = re.compile("^OpenWrt .*")
 
-bounding_box = "12.9,52.27,13.8,52.7"  # Berlin
+bounding_box = "12.9,52.27,14.12,52.7"  # Berlin and parts of East-Brandenburg (-> Fuerstenwalde)
 bounding_box_elems = [float(x) for x in bounding_box.split(",")]
 
 
