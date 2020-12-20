@@ -29,11 +29,6 @@
   ],
   "nodeInfos": [
     {
-      "name" : "OpenWifiMap",
-      "href" : "https://util.berlin.freifunk.net/knoteninfo?knoten={NODE_ID}&typ=owm",
-      "caption" : "{NODE_ID} auf openwifimap.net"
-    },
-    {
       "name" : "monitor.berlin.freifunk.net",
       "href" : "https://util.berlin.freifunk.net/knoteninfo?knoten={NODE_ID}&typ=monitor",
       "caption" : "{NODE_ID} auf monitor.berlin.freifunk.net"
