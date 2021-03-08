@@ -36,6 +36,30 @@ bounding_box = "12.9,52.27,14.12,52.7"  # Berlin and parts of East-Brandenburg (
 bounding_box_elems = [float(x) for x in bounding_box.split(",")]
 
 
+
+def hash_firmware(firmware: str) -> int:
+    """This function hashes a firmware string into an int to make
+    versions compareable. early versions get smaller numbers, more
+    recent ones get bigger numbers.
+    Frimware-Strings that do not follow the semantic versioning scheme
+    are considered pre-kathleen (return -1).
+
+    Args:
+        firmware (str): Name-string of a firmware with numbers at the end
+
+    Returns:
+        int: hash-value. If firmware doesn't follow semantiv-versioning
+        scheme, return -1.
+    """
+    # firmware-string matches semantic-versioning
+    version = re.search(".*([0-9]\.[0-9]\.[0-9]*)", firmware)
+    if version:
+        return int(version.group(1).replace('.',''))
+    else:
+        # Firmware does not follow version-string: considered pre-kathleen
+        return -1
+
+
 def handle_request(response):
     """requests node-data using the asynchronous http-client of tornado module."""
     global i
@@ -182,7 +206,7 @@ def process_node_json(comment, body, hostid=None, firstseen=None, lastseen=None)
             fw_name = owmnode['firmware']['name']
         except:
             fw_name = 'nothing' # Boolean __None__ would result in roughly 40 nodes being dropped.
-        if firmware_hedy.match(fw_name):
+        if hash_firmware(fw_name) >= 100: # firmware is newer than version 1.0.0
             isuplink = False
             for iface in owmnode["interfaces"]:
                 try:
