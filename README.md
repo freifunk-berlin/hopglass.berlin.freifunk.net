@@ -2,5 +2,6 @@ https://hopglass.berlin.freifunk.net
 
 ...runs an instance of HopGlass
 https://github.com/plumpudding/hopglass
-that gets its data from OpenWifiMap.net using a simple converter
-(found in owm2ffmap/).
+as our primary map.
+
+The OWM-script (see freifunk-berlin/packages) on the node uploads the data via util.berlin.freifunk.net to store them in a local folder.
