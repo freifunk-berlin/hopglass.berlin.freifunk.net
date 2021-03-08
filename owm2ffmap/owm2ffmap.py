@@ -23,6 +23,7 @@ i = 0
 
 firmware_prekathleen = re.compile("^Freifunk Berlin [0-9]\.*")
 firmware_hedy = re.compile("^Freifunk Berlin [hH]edy 1\.[0-9]\.[0-9]")
+firmware_falter = re.compile("^Freifunk Falter [0-9]\.[0-9]\.[0-9]")
 firmware_ffb_dev = re.compile("^Freifunk Berlin Dev")
 firmware_potsdam = re.compile("^Freifunk Potsdam")
 firmware_kathleen_correct = re.compile("^Freifunk Berlin kathleen 0\.[2-3]\.0$")
@@ -145,6 +146,10 @@ def parse_firmware(firmware):
                 print("hedy firmware")
                 firmware_release = firmware["name"]
                 firmware_base = firmware["revision"]
+            elif firmware_falter.match(firmware["name"]):
+                print("falter firmware")
+                firmware_release = firmware["name"]
+                firmware_base = firmware["revision"]
             elif firmware_prekathleen.match(firmware["name"]):  # "Freifunk Berlin 1.1.0-alpha"
                 print("pre kathleen firmware")
                 firmware_release = firmware["name"]
@@ -206,7 +211,9 @@ def process_node_json(comment, body, hostid=None, firstseen=None, lastseen=None)
             fw_name = owmnode['firmware']['name']
         except:
             fw_name = 'nothing' # Boolean __None__ would result in roughly 40 nodes being dropped.
-        if hash_firmware(fw_name) >= 100: # firmware is newer than version 1.0.0
+
+        site_code = None # TODO Falter-Hack. Delete later.
+        if hash_firmware(fw_name) >= 100 and hash_firmware(fw_name) < 110: # hedy-firmwares
             isuplink = False
             for iface in owmnode["interfaces"]:
                 try:
@@ -215,6 +222,16 @@ def process_node_json(comment, body, hostid=None, firstseen=None, lastseen=None)
                         break #avoid further iteration to save computing-power
                 except:
                     continue
+        elif hash_firmware(fw_name) >= 110:
+            # falter-1.1.0 does not send router interfaces anymore. Fetch uplink from olsr-config:
+            # Does the Router announce a gateway?
+            isuplink = False
+            print("DEBUG: " + str(owmnode["olsr"].get("ipv4Config").get("hasIpv4Gateway")))
+            if owmnode["olsr"].get("ipv4Config").get("hasIpv4Gateway") == True or owmnode["olsr"].get("ipv4Config").get("hasIpv6Gateway") == True:
+                isuplink = True
+                # Dirty-Fix: just assume, that any router which has WAN, also shares wifi.
+                # TODO: re-enable some information on interfaces in Falter-OWM.lua again
+                site_code = "hotspot"
         else:
             # general case: check if the router itself has an uplink via WAN. returns True or False
             isuplink = len([a for a in owmnode.get("interfaces", []) if a.get("ifname", "none") == "ffvpn"]) > 0
@@ -222,7 +239,8 @@ def process_node_json(comment, body, hostid=None, firstseen=None, lastseen=None)
                              if(a.get("encryption", "unknown") == "none" and a.get("mode", "unknown") == "ap")
                                or a.get("ifname", "none") == "br-dhcp"
                             ]) > 0
-        site_code = "hotspot" if hasclientdhcp else "routeronly"  # hack: allow selecting nodes with hotspot functionality via statistics
+        if site_code != "hotspot": # TODO Falter-Hack: delete later
+            site_code = "hotspot" if hasclientdhcp else "routeronly"  # hack: allow selecting nodes with hotspot functionality via statistics
         try:
             uptimesecs = owmnode["system"]["uptime"][0]
         except:
