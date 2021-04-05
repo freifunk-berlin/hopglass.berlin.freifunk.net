@@ -330,17 +330,20 @@ if __name__ == "__main__":
         node_list = None
         for nodename in os.listdir('/var/opt/ffmapdata/'):
             if nodename.endswith(".json"):
-                nodefile = '/var/opt/ffmapdata/' + nodename;
-                with open(nodefile, 'r') as myfile:
-                    data=myfile.read()
-                lastseen = datetime.datetime.utcfromtimestamp(getmtime(nodefile)).isoformat()
                 try:
-                    firstseen = datetime.datetime.utcfromtimestamp(getmtime(nodefile.replace(".json", ".ctime"))).isoformat()
-                except:
-                    firstseen = lastseen
-                nodename = nodename.replace(".json", "")
-                nodename = url_unescape(nodename)
-                process_node_json(nodename, data, hostid=nodename, firstseen=firstseen, lastseen=lastseen)
+                    nodefile = '/var/opt/ffmapdata/' + nodename;
+                    with open(nodefile, 'r') as myfile:
+                        data=myfile.read()
+                    lastseen = datetime.datetime.utcfromtimestamp(getmtime(nodefile)).isoformat()
+                    try:
+                        firstseen = datetime.datetime.utcfromtimestamp(getmtime(nodefile.replace(".json", ".ctime"))).isoformat()
+                    except:
+                        firstseen = lastseen
+                    nodename = nodename.replace(".json", "")
+                    nodename = url_unescape(nodename)
+                    process_node_json(nodename, data, hostid=nodename, firstseen=firstseen, lastseen=lastseen)
+                except Exception as e:
+                    print("Error processing node %s (%s), skipping" % (nodename, str(e)))
 
     timestamp = datetime.datetime.utcnow().isoformat()
 
