@@ -2,7 +2,6 @@ import datetime
 import dateutil.parser
 import json
 import os
-from os.path import getmtime
 import re
 import traceback
 import sys
@@ -184,7 +183,7 @@ nodes = []
 graphnodes = dict()
 graphlinks = []
 
-def process_node_json(comment, body, hostid=None, firstseen=None, lastseen=None):
+def process_node_json(comment, body):
     """transforms node data into ffmap-format. Does some interpretation on node
        data too (figure out if node has WAN-uplink, etc)"""
     global nodes
@@ -193,8 +192,8 @@ def process_node_json(comment, body, hostid=None, firstseen=None, lastseen=None)
     try:
         print("Converting " + comment)
         owmnode = json.loads(body)
-        firstseen = owmnode["ctime"][:-1] if firstseen is None else firstseen
-        lastseen = owmnode["mtime"][:-1] if lastseen is None else lastseen
+        firstseen = owmnode["ctime"][:-1]
+        lastseen = owmnode["mtime"][:-1]
         lastseensecs = (datetime.datetime.utcnow() - dateutil.parser.parse(lastseen)).total_seconds()
         isonline = lastseensecs < 60*60*24  # assume offline if not seen for more than a day
         if lastseensecs > 60*60*24*7:
@@ -245,7 +244,7 @@ def process_node_json(comment, body, hostid=None, firstseen=None, lastseen=None)
             uptimesecs = owmnode["system"]["uptime"][0]
         except:
             uptimesecs = 0
-        hostid = owmnode["_id"] if hostid is None else hostid  # with ".olsr"
+        hostid = owmnode["_id"]  # with ".olsr"
         hostname = owmnode["hostname"]  # without ".olsr"
         is24ghz = True
         try:
@@ -324,9 +323,10 @@ def process_node_json(comment, body, hostid=None, firstseen=None, lastseen=None)
 
 if __name__ == "__main__":
     try:
+        raise Exception("No need to fetch via web since api.openwifimap.net runs on same VM")
         node_list = json.loads(get_nodes())
     except:
-        print("Error accessing openwifimap.net")
+        print("Error accessing api.openwifimap.net")
         node_list = None
         for nodename in os.listdir('/var/opt/ffmapdata/'):
             if nodename.endswith(".json"):
@@ -334,14 +334,9 @@ if __name__ == "__main__":
                     nodefile = '/var/opt/ffmapdata/' + nodename;
                     with open(nodefile, 'r') as myfile:
                         data=myfile.read()
-                    lastseen = datetime.datetime.utcfromtimestamp(getmtime(nodefile)).isoformat()
-                    try:
-                        firstseen = datetime.datetime.utcfromtimestamp(getmtime(nodefile.replace(".json", ".ctime"))).isoformat()
-                    except:
-                        firstseen = lastseen
                     nodename = nodename.replace(".json", "")
                     nodename = url_unescape(nodename)
-                    process_node_json(nodename, data, hostid=nodename, firstseen=firstseen, lastseen=lastseen)
+                    process_node_json(nodename, data)
                 except Exception as e:
                     print("Error processing node %s (%s), skipping" % (nodename, str(e)))
 
@@ -358,7 +353,7 @@ if __name__ == "__main__":
             else:
                 process_node_json(url, nodejson)
 
-        print("Getting %d node infos from openwifimap.net" % i)
+        print("Getting %d node infos from api.openwifimap.net" % i)
         if i > 0:
             ioloop.IOLoop.instance().start()
         # node data has been fetched and converted here
