@@ -39,16 +39,18 @@ bounding_box_elems = [float(x) for x in bounding_box.split(",")]
 
 def hash_firmware(firmware: str) -> int:
     """This function hashes a firmware string into an int to make
-    versions compareable. early versions get smaller numbers, more
+    versions compareable. Early versions get smaller numbers, more
     recent ones get bigger numbers.
     Frimware-Strings that do not follow the semantic versioning scheme
     are considered pre-kathleen (return -1).
+    This code is only guaranteed to work correctly with single-digit 
+    Minor- and Patch-versions.
 
     Args:
         firmware (str): Name-string of a firmware with numbers at the end
 
     Returns:
-        int: hash-value. If firmware doesn't follow semantiv-versioning
+        int: hash-value. If firmware doesn't follow semantic-versioning
         scheme, return -1.
     """
     # firmware-string matches semantic-versioning
