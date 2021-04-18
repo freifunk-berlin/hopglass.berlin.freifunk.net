@@ -214,7 +214,7 @@ def process_node_json(comment, body, ignore_if_offline=True):
                         break #avoid further iteration to save computing power
                 except:
                     continue
-        elif fw_version_equal_or_more_recent(fw_name, "1.1.0"):
+        elif fw_name.startswith("Freifunk ") and fw_version_equal_or_more_recent(fw_name, "1.1.0"):
             # falter-1.1.0 does not send router interfaces anymore. Fetch uplink from olsr config:
             # Does the router announce a gateway?
             isuplink = False
@@ -227,6 +227,7 @@ def process_node_json(comment, body, ignore_if_offline=True):
         else:
             # general case: check if the router itself has an uplink via WAN. returns True or False
             isuplink = len([a for a in owmnode.get("interfaces", []) if a.get("ifname", "none") == "ffvpn"]) > 0
+
         hasclientdhcp = len([a for a in owmnode.get("interfaces", [])
                              if(a.get("encryption", "unknown") == "none" and a.get("mode", "unknown") == "ap")
                                or a.get("ifname", "none") == "br-dhcp"
