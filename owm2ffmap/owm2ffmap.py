@@ -33,7 +33,7 @@ firmware_pre020_dev  = re.compile("^Freifunk[ -]Berlin kathleen 0\.[0-2]\.[0-2][
 firmware_kathleen1505 = re.compile("^Freifunk Berlin kathleen 15.05(\.1){0,1}$")
 firmware_openwrt = re.compile("^OpenWrt .*")
 
-bounding_box = "12.9,52.27,14.12,52.7"  # Berlin and parts of East-Brandenburg (-> Fuerstenwalde)
+bounding_box = "12.9,52.27,14.12,52.7"  # Berlin and parts of East Brandenburg (-> Fuerstenwalde)
 bounding_box_elems = [float(x) for x in bounding_box.split(",")]
 
 update_tests = "".join(sys.argv[1:]) == "--update-tests"
@@ -65,7 +65,7 @@ def hash_firmware(firmware: str) -> int:
 
 
 def handle_request(response):
-    """requests node-data using the asynchronous http-client of tornado module."""
+    """requests node data using the asynchronous http client of tornado module."""
     global i
     print("URL: %s, code: %d, bytes: %d, URLs to go: %d" % (response.effective_url, response.code, len(response.body) if response.code == 200 else 0, i))
     if response.code == 200:
@@ -175,7 +175,7 @@ def parse_firmware(firmware):
             firmware_release = re.sub(r'^OpenWrt Barrier Breaker', 'OpenWrt BB', firmware_release)
             firmware_release = re.sub(r'^OpenWrt Chaos Calmer', 'OpenWrt CC', firmware_release)
         except:
-            print("firmwaredecode-exception")
+            print("firmwaredecode exception")
             traceback.print_exc(file=sys.stdout)
             firmware_base = "unknown"
             firmware_release = "unknown"
@@ -209,7 +209,7 @@ def process_node_json(comment, body, ignore_if_offline=True):
             print("...out of geographic bounds, skipping")
             return
 
-        # special case: fetch wether there is uplink or not for hedy-devices. general case below
+        # special case: fetch whether there is uplink or not for hedy devices. general case below
         try:
             fw_name = owmnode['firmware']['name']
         except:
@@ -222,7 +222,7 @@ def process_node_json(comment, body, ignore_if_offline=True):
                 try:
                     if iface["device"] == "ffuplink":
                         isuplink = True
-                        break #avoid further iteration to save computing-power
+                        break #avoid further iteration to save computing power
                 except:
                     continue
         elif hash_firmware(fw_name) >= 110:
@@ -232,7 +232,7 @@ def process_node_json(comment, body, ignore_if_offline=True):
             print("DEBUG: " + str(owmnode["olsr"].get("ipv4Config").get("hasIpv4Gateway")))
             if owmnode["olsr"].get("ipv4Config").get("hasIpv4Gateway") == True or owmnode["olsr"].get("ipv4Config").get("hasIpv6Gateway") == True:
                 isuplink = True
-                # Dirty-Fix: just assume, that any router which has WAN, also shares wifi.
+                # Dirty fix: just assume that any router which has WAN also shares wifi.
                 # TODO: re-enable some information on interfaces in Falter-OWM.lua again
                 site_code = "hotspot"
         else:
@@ -242,7 +242,7 @@ def process_node_json(comment, body, ignore_if_offline=True):
                              if(a.get("encryption", "unknown") == "none" and a.get("mode", "unknown") == "ap")
                                or a.get("ifname", "none") == "br-dhcp"
                             ]) > 0
-        if site_code != "hotspot": # TODO Falter-Hack: delete later
+        if site_code != "hotspot": # TODO Falter hack: delete later
             site_code = "hotspot" if hasclientdhcp else "routeronly"  # hack: allow selecting nodes with hotspot functionality via statistics
         try:
             uptimesecs = owmnode["system"]["uptime"][0]
