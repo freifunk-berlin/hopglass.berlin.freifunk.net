@@ -1,12 +1,13 @@
 import datetime
 import dateutil.parser
 import json
+from glob import glob
 import os
 import re
 import traceback
 import sys
 from tornado import gen, ioloop, httpclient
-from tornado.escape import url_unescape
+from tornado.escape import url_unescape, url_escape
 from diskcache import Cache
 
 # This is a quick hack to pull Freifunk node data for a specific geographic area
@@ -35,6 +36,7 @@ firmware_openwrt = re.compile("^OpenWrt .*")
 bounding_box = "12.9,52.27,14.12,52.7"  # Berlin and parts of East-Brandenburg (-> Fuerstenwalde)
 bounding_box_elems = [float(x) for x in bounding_box.split(",")]
 
+update_tests = "".join(sys.argv[1:]) == "--update-tests"
 
 
 def hash_firmware(firmware: str) -> int:
@@ -184,12 +186,13 @@ nodes = []
 graphnodes = dict()
 graphlinks = []
 
-def process_node_json(comment, body):
-    """transforms node data into ffmap-format. Does some interpretation on node
+def process_node_json(comment, body, ignore_if_offline=True):
+    """transforms node data into ffmap format. Does some interpretation on node
        data too (figure out if node has WAN-uplink, etc)"""
     global nodes
     global graphnodes
     global graphlinks
+    global update_tests
     try:
         print("Converting " + comment)
         owmnode = json.loads(body)
@@ -197,7 +200,7 @@ def process_node_json(comment, body):
         lastseen = owmnode["mtime"][:-1]
         lastseensecs = (datetime.datetime.utcnow() - dateutil.parser.parse(lastseen)).total_seconds()
         isonline = lastseensecs < 60*60*24  # assume offline if not seen for more than a day
-        if lastseensecs > 60*60*24*7:
+        if ignore_if_offline and lastseensecs > 60*60*24*7 and not update_tests:
             print("...offline more than a week, skipping")
             return
         longitude = owmnode["longitude"]
@@ -301,6 +304,12 @@ def process_node_json(comment, body):
         nodes.append(node)
         print(node)
 
+        if update_tests:
+            f_name = f"testdata/data_{url_escape(hostid)}.json"
+            if not os.path.isfile(f_name):
+                with open(f_name, 'w') as f:
+                    f.write(json.dumps({"owmnode": owmnode, "ffmapnode": node}))
+
         for link in owmnode.get("links", []):
           targetid = link["id"]
           quality = link["quality"]
@@ -315,8 +324,24 @@ def process_node_json(comment, body):
         graphnodes[hostid] = {"id": hostid, "node_id": hostid, "seq": len(graphnodes)}
         print(graphnodes[hostid])
         print("**********************************")
+        return node
     except:
         traceback.print_exc(file=sys.stdout)
+
+
+def do_regression_test(test_file):
+    with open(test_file, 'r') as f:
+        previous_data = json.loads(f.read())
+        current_ffmap = process_node_json(test_file, json.dumps(previous_data["owmnode"]), ignore_if_offline=False)
+        current_str = json.dumps(current_ffmap, sort_keys=True, indent=4)
+        previous_str = json.dumps(previous_data["ffmapnode"], sort_keys=True, indent=4)
+        assert current_str == previous_str, f"Not equal (current, expected):\n{current_str}\n{previous_str}"
+
+
+def run_complete_regression_test():
+    for f_name in glob(f"testdata/data_*.json"):
+        do_regression_test(f_name)
+    print("Regression test completed successfully.")
 
 
 # if you want to test the functions defined above in an interactive way, just start
@@ -324,6 +349,10 @@ def process_node_json(comment, body):
 
 
 if __name__ == "__main__":
+    if "".join(sys.argv[1:]) == "--tests":
+        run_complete_regression_test()
+        sys.exit()
+
     try:
         node_list = json.loads(get_nodes())
     except:
