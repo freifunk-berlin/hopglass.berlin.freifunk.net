@@ -39,29 +39,18 @@ bounding_box_elems = [float(x) for x in bounding_box.split(",")]
 update_tests = "".join(sys.argv[1:]) == "--update-tests"
 
 
-def hash_firmware(firmware: str) -> int:
-    """This function hashes a firmware string into an int to make
-    versions compareable. Early versions get smaller numbers, more
-    recent ones get bigger numbers.
-    Frimware-Strings that do not follow the semantic versioning scheme
-    are considered pre-kathleen (return -1).
-    This code is only guaranteed to work correctly with single-digit 
-    Minor- and Patch-versions.
-
-    Args:
-        firmware (str): Name-string of a firmware with numbers at the end
-
-    Returns:
-        int: hash-value. If firmware doesn't follow semantic-versioning
-        scheme, return -1.
-    """
-    # firmware-string matches semantic-versioning
-    version = re.search(".*([0-9]\.[0-9]\.[0-9]*)", firmware)
-    if version:
-        return int(version.group(1).replace('.',''))
-    else:
-        # Firmware does not follow version-string: considered pre-kathleen
-        return -1
+def fw_version_equal_or_more_recent(ver_a, ver_b: str, ) -> bool:
+    """Returns True if ver_a is a semantic version string and greater
+    or equal to ver_b, otherwise False."""
+    va_re = re.search(".*([0-9]+\.[0-9]+\.[0-9]*)", ver_a)
+    if not va_re:
+        return False
+    va = [int(n) for n in va_re.group(1).split(".")]
+    vb = [int(n) for n in ver_b.split(".")]
+    for i in range(0, 3):
+        if va[i] != vb[i]:
+            return va[i] > vb[i]
+    return True
 
 
 def handle_request(response):
@@ -215,8 +204,8 @@ def process_node_json(comment, body, ignore_if_offline=True):
         except:
             fw_name = 'nothing' # Boolean __None__ would result in roughly 40 nodes being dropped.
 
-        site_code = None # TODO Falter-Hack. Delete later.
-        if hash_firmware(fw_name) >= 100 and hash_firmware(fw_name) < 110: # hedy-firmwares
+        site_code = None # TODO Falter hack. Delete later.
+        if fw_version_equal_or_more_recent(fw_name, "1.0.0") and not fw_version_equal_or_more_recent(fw_name, "1.1.0"): # hedy firmwares
             isuplink = False
             for iface in owmnode["interfaces"]:
                 try:
@@ -225,9 +214,9 @@ def process_node_json(comment, body, ignore_if_offline=True):
                         break #avoid further iteration to save computing power
                 except:
                     continue
-        elif hash_firmware(fw_name) >= 110:
-            # falter-1.1.0 does not send router interfaces anymore. Fetch uplink from olsr-config:
-            # Does the Router announce a gateway?
+        elif fw_version_equal_or_more_recent(fw_name, "1.1.0"):
+            # falter-1.1.0 does not send router interfaces anymore. Fetch uplink from olsr config:
+            # Does the router announce a gateway?
             isuplink = False
             print("DEBUG: " + str(owmnode["olsr"].get("ipv4Config").get("hasIpv4Gateway")))
             if owmnode["olsr"].get("ipv4Config").get("hasIpv4Gateway") == True or owmnode["olsr"].get("ipv4Config").get("hasIpv6Gateway") == True:
