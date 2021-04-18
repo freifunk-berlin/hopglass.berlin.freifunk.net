@@ -80,7 +80,7 @@ def handle_request(response):
 def get_nodes():
     """gets a list of all routers within the bounding box from openwifimap"""
     global cache
-    url = "http://api.openwifimap.net/view_nodes_spatial?bbox=" + bounding_box
+    url = "https://api.openwifimap.net/view_nodes_spatial?bbox=" + bounding_box
     if url in cache:
         return cache[url]
     http_client = httpclient.HTTPClient()
@@ -347,7 +347,7 @@ if __name__ == "__main__":
     if node_list is not None:
         http_client = httpclient.AsyncHTTPClient()
         for row in node_list["rows"]:
-            url = "http://api.openwifimap.net/db/" + row["id"].strip()
+            url = "https://api.openwifimap.net/db/" + row["id"].strip()
             nodejson = cache.get(url, None)
             if nodejson is None:
                 i += 1
