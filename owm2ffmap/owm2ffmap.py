@@ -320,12 +320,12 @@ def process_node_json(comment, body):
         traceback.print_exc(file=sys.stdout)
 
 
-
+# if you want to test the functions defined above in an interactive way, just start
+# the python interpreter, then "from owm2ffmap import (function)", then go crazy.
 
 
 if __name__ == "__main__":
     try:
-        raise Exception("No need to fetch via web since api.openwifimap.net runs on same VM")
         node_list = json.loads(get_nodes())
     except:
         print("Error accessing api.openwifimap.net")
