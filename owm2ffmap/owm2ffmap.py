@@ -188,7 +188,7 @@ def process_node_json(comment, body, ignore_if_offline=True):
         firstseen = owmnode["ctime"][:-1]
         lastseen = owmnode["mtime"][:-1]
         lastseensecs = (datetime.datetime.utcnow() - dateutil.parser.parse(lastseen)).total_seconds()
-        isonline = lastseensecs < 60*60*24  # assume offline if not seen for more than a day
+        isonline = lastseensecs < 60*60*2  # assume offline if not seen for more than 2 hours
         if ignore_if_offline and lastseensecs > 60*60*24*7 and not update_tests:
             print("...offline more than a week, skipping")
             return
