@@ -1,22 +1,20 @@
 import datetime
 import dateutil.parser
 import json
-from glob import glob
 import os
 import re
 import traceback
 import sys
 import asyncio
 from tornado import httpclient
-from tornado.escape import url_unescape, url_escape
+from tornado.escape import url_unescape
 from diskcache import Cache
-
+import requests
 
 # This is a quick hack to pull Freifunk node data for a specific geographic area
 # from OpenWifiMap (OWM) and to convert it to the format used by Gluon communities
-# e.g. meshviewer
-# it is an evolution of the owm2ffmap script, but works with a current python and tornado version
-
+# typically (ffmap-backend, nodes.json and graph.json) in order to be able to use
+# it with compatible frontends such as HopGlass.
 
 # The cache is mostly helpful when debugging the script.
 # Use /dev/shm ramdisk since that's much faster than real disks on shared VMs
@@ -38,11 +36,31 @@ firmware_kathleen1505 = re.compile(r"^Freifunk Berlin kathleen 15.05(\.1){0,1}$"
 firmware_openwrt = re.compile("^OpenWrt .*")
 
 bounding_box = (
-    "12.9,52.27,14.12,52.7"  # Berlin and parts of East Brandenburg (-> Fuerstenwalde)
+    "12.5,52.1,14.5,52.9"  # Berlin and parts of East Brandenburg (-> Fuerstenwalde)
 )
 bounding_box_elems = [float(x) for x in bounding_box.split(",")]
+date_format = "%Y-%m-%dT%H:%M:%S+0000"
+prometheus_url = "http://localhost:9090/api/v1/query?query=collectd_dhcpleases_count{}"
+dhcp_clients = {}
+nodes = []
+graphlinks = []
 
-update_tests = "".join(sys.argv[1:]) == "--update-tests"
+
+def get_dhcp_clients():
+    global dhcp_clients
+    global prometheus_url
+    try:
+        response = requests.get(prometheus_url, timeout=5)
+    except Exception as e:
+        print(f"Error accessing Prometheus API: {e}")
+        return
+    if response.status_code == 200:
+        data = response.json()
+        if "data" in data and "result" in data["data"]:
+            for result in data["data"]["result"]:
+                node = result["metric"]["exported_instance"]
+                clients = int(result["value"][1])
+                dhcp_clients[node] = clients
 
 
 def fw_version_equal_or_more_recent(
@@ -89,7 +107,7 @@ def parse_firmware(firmware):
     """extracts firmware data from OWM data and returns firmware name and revision"""
     firmware_base = "unknown"
     firmware_release = "unknown"
-    print("Firmware (raw): {}/{}".format(firmware["name"], firmware["revision"]))
+    print(f"Firmware (raw): {firmware['name']}/{firmware['revision']}")
     try:
         if "name" in firmware and len(firmware["name"]) == 0:
             firmware_name = firmware[
@@ -183,34 +201,28 @@ def parse_firmware(firmware):
         traceback.print_exc(file=sys.stdout)
         firmware_base = "unknown"
         firmware_release = "unknown"
-    print("Firmware release '{}', base '{}'".format(firmware_release, firmware_base))
+    print(f"Firmware release '{firmware_release}', base '{firmware_base}'")
     return (firmware_base, firmware_release)
-
-
-nodes = []
-graphnodes = dict()
-graphlinks = []
 
 
 def process_node_json(comment, body, ignore_if_offline=True):
     """transforms node data into ffmap format. Does some interpretation on node
     data too (figure out if node has WAN-uplink, etc)"""
     global nodes
-    global graphnodes
     global graphlinks
-    global update_tests
+    global dhcp_clients
     try:
         print("Converting " + comment)
         owmnode = json.loads(body)
-        firstseen = owmnode["ctime"][:-1]
-        lastseen = owmnode["mtime"][:-1]
-        lastseensecs = (
-            datetime.datetime.utcnow() - dateutil.parser.parse(lastseen)
-        ).total_seconds()
-        isonline = (
-            lastseensecs < 60 * 60 * 2
-        )  # assume offline if not seen for more than 2 hours
-        if ignore_if_offline and lastseensecs > 60 * 60 * 24 * 7 and not update_tests:
+        firstseen = dateutil.parser.parse(owmnode["ctime"][:-1]).astimezone(
+            datetime.UTC
+        )
+        lastseen = dateutil.parser.parse(owmnode["mtime"][:-1]).astimezone(datetime.UTC)
+        if lastseen < datetime.datetime.now(datetime.UTC) - datetime.timedelta(hours=3):
+            isonline = False
+        else:
+            isonline = True
+        if ignore_if_offline and not isonline:
             print("...offline more than a week, skipping")
             return
         longitude = owmnode["longitude"]
@@ -245,17 +257,17 @@ def process_node_json(comment, body, ignore_if_offline=True):
             # falter-1.1.0 does not send router interfaces anymore. Fetch uplink from olsr config:
             # Does the router announce a gateway?
             isuplink = False
-            print(
-                "DEBUG: " + str(owmnode["olsr"].get("ipv4Config").get("hasIpv4Gateway"))
-            )
-            if (
-                owmnode["olsr"].get("ipv4Config").get("hasIpv4Gateway") is True
-                or owmnode["olsr"].get("ipv4Config").get("hasIpv6Gateway") is True
-            ):
-                isuplink = True
+            try:
+                if (
+                    owmnode["olsr"].get("ipv4Config").get("hasIpv4Gateway") is True
+                    or owmnode["olsr"].get("ipv4Config").get("hasIpv6Gateway") is True
+                ):
+                    isuplink = True
                 # Dirty fix: just assume that any router which has WAN also shares wifi.
                 # TODO: re-enable some information on interfaces in Falter-OWM.lua again
                 site_code = "hotspot"
+            except:
+                pass
         else:
             # general case: check if the router itself has an uplink via WAN. returns True or False
             isuplink = (
@@ -288,9 +300,11 @@ def process_node_json(comment, body, ignore_if_offline=True):
                 "hotspot" if hasclientdhcp else "routeronly"
             )  # hack: allow selecting nodes with hotspot functionality via statistics
         try:
-            uptime = datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(seconds=owmnode["system"]["uptime"][0])
+            uptime = datetime.datetime.now(datetime.UTC) - datetime.timedelta(
+                seconds=owmnode["system"]["uptime"][0]
+            )
         except:
-            uptime = datetime.datetime.now(datetime.timezone.utc)
+            uptime = datetime.datetime.now(datetime.UTC)
         hostid = owmnode["_id"]  # with ".olsr"
         hostname = owmnode["hostname"]  # without ".olsr"
         is24ghz = True
@@ -334,93 +348,119 @@ def process_node_json(comment, body, ignore_if_offline=True):
                 ),
             )
             print("no 'firmware' JSON node found")
-            print(
-                f"Firmware release '{firmware_release}', base '{firmware_base}'"
-            )
+            print(f"Firmware release '{firmware_release}', base '{firmware_base}'")
 
-        node_addresses = [link['sourceAddr4'] for link in owmnode["links"] if "sourceAddr4" in link]
+        # Addresses
+        node_addresses = []
+
         try:
+            node_addresses += [
+                link["sourceAddr4"]
+                for link in owmnode["links"]
+                if "sourceAddr4" in link
+            ]
             node_addresses.append(owmnode["olsr"]["ipv4Config"]["config"]["mainIp"])
         except KeyError:
             pass
+        # Deduplicate list
+        node_addresses = sorted(list(set(node_addresses)))
+
+        # Load
         try:
-            loadavg = owmnode["system"]["loadavg"]
+            loadavg = owmnode["system"]["loadavg"][0]
         except KeyError:
             loadavg = "0.0"
+
+        # Clients
+
+        clients = dhcp_clients[hostname] if hostname in dhcp_clients else 0
+
+        # nodeID
+        # in gluon this is a mac address, we currently do not have this information
+        node_id = str(len(nodes)).zfill(12)
+
         node = dict(
-            firstseen=firstseen,
-            lastseen=lastseen,
+            firstseen=firstseen.strftime(date_format),
+            lastseen=lastseen.strftime(date_format),
             is_online=isonline,
             is_gateway=isuplink,
-            clients=0,
-            clients_wifi24=0,
-            clients_wifi5=0,
-            clients_other=0,
-            clients_owe=0,
-            clients_owe24=0,
-            clients_owe5=0,
-            rootfs_usage=0.0,
+            clients=clients,
+            # clients_wifi24=0,
+            # clients_wifi5=0,
+            # clients_other=0,
+            # clients_owe=0,
+            # clients_owe24=0,
+            # clients_owe5=0,
+            # rootfs_usage=0.0,
             loadavg=loadavg,
-            memory_usage=0.0,
-            uptime=uptime.isoformat(),
-            gateway_nexthop="",  # TODO
-            gateway="",  # TODO
-            gateway6="",  # TODO
-            node_id=hostid,
-            mac="84:16:f9:9b:bc:0a",
+            # memory_usage=0.0,
+            uptime=uptime.strftime(date_format),
+            gateway_nexthop="N/A",  # TODO
+            gateway="N/A",  # TODO
+            # gateway6="",  # TODO
+            node_id=node_id,
+            # mac="84:16:f9:9b:bc:0a",
             addresses=node_addresses,
             domain="ffberlin",
             hostname=hostname,
-            owner="",
+            owner=email,
+            location=dict(longitude=longitude, latitude=latitude),
             firmware=dict(
                 base=firmware_base,
-                release=firmware_release
+                release=firmware_release,
+                # target="ath79",
+                # subtarget="generic",
+                # image_name="ubiquiti-unifi-ac-mesh"
             ),
-            autoupdater=dict(
-                enabled=False,
-                branch="stable"
-            ),
-            nproc=1,
+            autoupdater=dict(enabled=False, branch="N/A"),
+            # nproc=1,
             model=hardware_model,
-            custom_fields=dict(
-                advanced_stats="true"
-            ),
-            location=dict(
-                longitude=longitude,
-                latitude=latitude
-            ),
         )
         nodes.append(node)
-
-        if update_tests:
-            f_name = f"testdata/data_{url_escape(hostid)}.json"
-            if not os.path.isfile(f_name):
-                with open(f_name, "w") as f:
-                    f.write(json.dumps({"owmnode": owmnode, "ffmapnode": node}))
 
         for link in owmnode.get("links", []):
             targetid = link["id"]
             quality = link["quality"]
-            quality = 1.0 / float(quality) if quality > 0 else 999
-            graphlink = {
-                "type": "wifi",
-                "source": hostid,
-                "target": targetid,
-                "source_tq": quality,
-                "target_tq": quality,
-                "source_addr": "C0:FF:EE:F0:0B:AA",
-                "target_addr": "C0:FF:EE:F0:0B:AA"
-            }
-            graphlinks.append(graphlink)
-        graphnodes[hostid] = {"id": hostid, "node_id": hostid, "seq": len(graphnodes)}
-        #print(graphnodes)
+
+            if len(graphlinks) == 0:
+                newlink = True
+
+            for existing_link in graphlinks:
+                if (existing_link["target_hostname"] == hostid) and (
+                    existing_link["source_hostname"] == link["id"]
+                ):
+                    existing_link["target_tq"] = quality
+                    newlink = False
+                    break
+
+                elif (existing_link["source_hostname"] == hostid) and (
+                    existing_link["target_hostname"] == link["id"]
+                ):
+                    newlink = False
+                    break
+                else:
+                    newlink = True
+
+            if newlink:
+                graphlink = {
+                    "source_hostname": hostid,
+                    "target_hostname": targetid,
+                    "source_tq": quality,
+                    "target_tq": quality,
+                }
+                graphlinks.append(graphlink)
+
         return node
     except:
         traceback.print_exc(file=sys.stdout)
 
 
 if __name__ == "__main__":
+
     async def main():
+        # Get dhcp clients from prometheus
+        get_dhcp_clients()
+
         # Try fetching from OWM; on failure, use local files
         try:
             node_list = json.loads(await get_nodes())
@@ -482,26 +522,37 @@ if __name__ == "__main__":
             print("openwifimap seems offline. Using local files.")
 
         # Build outputs
-        timestamp = datetime.datetime.now(datetime.timezone.utc).isoformat()
+        timestamp = datetime.datetime.now(datetime.UTC).strftime(date_format)
+
         brokenlinks = []
+        # Update graphlinks with node_id
         for link in graphlinks:
-            if link["source"] not in [node["node_id"] for node in nodes]:
-                print(
-                    f"Could not resolve source {link["source"]} for graph"
-                )
-                brokenlinks.append(link)
-            elif link["target"] not in [node["node_id"] for node in nodes]:
-                print(
-                    f"Could not resolve target {link["target"]} for graph"
-                )
-                brokenlinks.append(link)
+            source_node = [
+                node
+                for node in nodes
+                if node["hostname"] + ".olsr" == link["source_hostname"]
+            ]
+
+            link["source"] = (
+                source_node[0]["node_id"] if source_node else brokenlinks.append(link)
+            )
+
+            target_node = [
+                node
+                for node in nodes
+                if node["hostname"] + ".olsr" == link["target_hostname"]
+            ]
+            link["target"] = (
+                target_node[0]["node_id"] if target_node else brokenlinks.append(link)
+            )
+
+            link["type"] = "unknown"
+            # del link["source_hostname"]
+            # del link["target_hostname"]
+
         graphlinks[:] = [link for link in graphlinks if link not in brokenlinks]
 
-       # ordered_graphnodes = [node for _, node in graphnodes.items()]
-       # ordered_graphnodes = sorted(ordered_graphnodes, key=lambda x: x["seq"])
-
         nodes_out = {"timestamp": timestamp, "nodes": nodes, "links": graphlinks}
-        #print(nodes_out)
         with open("nodes_meshviewer.json", "w") as outfile:
             json.dump(nodes_out, outfile)
 
