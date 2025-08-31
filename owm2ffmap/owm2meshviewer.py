@@ -6,6 +6,7 @@ import re
 import traceback
 import sys
 import asyncio
+import hashlib
 from tornado import httpclient
 from tornado.escape import url_unescape
 from diskcache import Cache
@@ -19,7 +20,7 @@ import requests
 # The cache is mostly helpful when debugging the script.
 # Use /dev/shm ramdisk since that's much faster than real disks on shared VMs
 # typically.
-cache = Cache("/dev/shm/owm2ffmap_cache")
+cache = Cache("/dev/shm/owm2meshviewer_cache")
 
 firmware_prekathleen = re.compile(r"^Freifunk Berlin [0-9]\.*")
 firmware_hedy = re.compile(r"^Freifunk Berlin [hH]edy 1\.[0-9]\.[0-9]")
@@ -40,7 +41,7 @@ bounding_box = (
 )
 bounding_box_elems = [float(x) for x in bounding_box.split(",")]
 date_format = "%Y-%m-%dT%H:%M:%S+0000"
-prometheus_url = "http://localhost:9090/api/v1/query?query=collectd_dhcpleases_count{}"
+prometheus_url = "http://monitor.berlin.freifunk.net:9090/api/v1/query?query=collectd_dhcpleases_count{}"
 dhcp_clients = {}
 nodes = []
 graphlinks = []
@@ -61,6 +62,10 @@ def get_dhcp_clients():
                 node = result["metric"]["exported_instance"]
                 clients = int(result["value"][1])
                 dhcp_clients[node] = clients
+
+
+def get_node_id(hostname) -> str:
+    return hashlib.sha1(hostname.encode("utf-8")).hexdigest()[:12]
 
 
 def fw_version_equal_or_more_recent(
@@ -218,11 +223,11 @@ def process_node_json(comment, body, ignore_if_offline=True):
             datetime.UTC
         )
         lastseen = dateutil.parser.parse(owmnode["mtime"][:-1]).astimezone(datetime.UTC)
-        if lastseen < datetime.datetime.now(datetime.UTC) - datetime.timedelta(hours=3):
+        if lastseen < datetime.datetime.now(datetime.UTC) - datetime.timedelta(hours=4):
             isonline = False
         else:
             isonline = True
-        if ignore_if_offline and not isonline:
+        if ignore_if_offline and not isonline and lastseen < datetime.datetime.now(datetime.UTC) - datetime.timedelta(weeks=1):
             print("...offline more than a week, skipping")
             return
         longitude = owmnode["longitude"]
@@ -377,7 +382,7 @@ def process_node_json(comment, body, ignore_if_offline=True):
 
         # nodeID
         # in gluon this is a mac address, we currently do not have this information
-        node_id = str(len(nodes)).zfill(12)
+        node_id = get_node_id(hostname)
 
         node = dict(
             firstseen=firstseen.strftime(date_format),
@@ -401,7 +406,7 @@ def process_node_json(comment, body, ignore_if_offline=True):
             node_id=node_id,
             # mac="84:16:f9:9b:bc:0a",
             addresses=node_addresses,
-            domain="ffberlin",
+            domain=owmnode["freifunk"]["community"]["name"],
             hostname=hostname,
             owner=email,
             location=dict(longitude=longitude, latitude=latitude),
