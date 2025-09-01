@@ -1,3 +1,9 @@
+# Archived
+
+
+Since our migration to meshviewer, the configuration for this host is now merged into https://github.com/freifunk-berlin/ansible.
+
+
 https://hopglass.berlin.freifunk.net
 
 ...runs an instance of HopGlass
